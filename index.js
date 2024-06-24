@@ -64,7 +64,7 @@ const isSuitableHandler = ({ deposit, rent, maximumDeposit, maximumRent, perHund
     if (deposit > maximumDeposit || rent > maximumRent) {
         return false;
     }
-    if (convertDepositToRent(deposit, perHundred) + rent > rent) {
+    if (convertDepositToRent(deposit, perHundred) + rent > maximumRent) {
         return false;
     }
     if (rent === 0 && deposit === 0) {
@@ -104,18 +104,22 @@ bot.on('message', async (msg) => {
     } else if (currentState === 'awaitingUrl' && msg.text.startsWith('https://divar.ir/')) {
         urlToFetch = msg.text;
         currentState = 'awaitingDeposit'; // Set the state to awaiting deposit
+        console.log(currentState);
         bot.sendMessage(chatId, "Please enter the deposit amount (in numbers):");
     } else if (currentState === 'awaitingDeposit' && !isNaN(parseInt(msg.text))) {
         deposit = parseInt(msg.text);
         currentState = 'awaitingRent'; // Set the state to awaiting rent
+        console.log(currentState);
         bot.sendMessage(chatId, "Please enter the rent amount (in numbers):");
     } else if (currentState === 'awaitingRent' && !isNaN(parseInt(msg.text))) {
         rent = parseInt(msg.text);
         currentState = 'awaitingPerHundred'; // Set the state to awaiting rent
+        console.log(currentState);
         bot.sendMessage(chatId, "Please enter per hundred (in numbers):");
     } else if (currentState === 'awaitingPerHundred' && !isNaN(parseInt(msg.text))) {
         perHundred = parseInt(msg.text)
         currentState = 'idle'; // Reset state
+        bot.sendMessage(chatId, `Fetching data from: ${urlToFetch}, Deposit: ${formatNumberWithCommas(deposit)}, rent: ${formatNumberWithCommas(rent)} and per hundred ${formatNumberWithCommas(perHundred)} cost from rent...`)
         fetchData(urlToFetch, deposit, rent, perHundred);
     } else if (isRunning) {
         bot.sendMessage(chatId, "Invalid input. Please enter a correct value.");
@@ -126,7 +130,6 @@ bot.on('message', async (msg) => {
 const fetchData = async (url, deposit, rent, perHundred) => {
     if (!isRunning) return; // Check if the bot is running before proceeding
     console.log("Fetching data from:", url);
-    bot.sendMessage(chatId, `Fetching data from: ${urlToFetch}, Deposit: ${formatNumberWithCommas(deposit)}, rent: ${formatNumberWithCommas(rent)} and per hundred ${formatNumberWithCommas(perHundred)} cost from rent...`)
     try {
         const response = await axios.get(url);
         if (response.status !== 200) {
