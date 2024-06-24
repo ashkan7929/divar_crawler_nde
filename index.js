@@ -1,13 +1,9 @@
-const express = require('express');
 const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const cheerio = require('cheerio');
 
 const botToken = '7282286025:AAFLMTYQZE2GsuVGQeFYvi2vFAhvoLAen3o'; // Replace with your actual bot token
 const bot = new TelegramBot(botToken, { polling: true });
-
-const app = express();
-const port = process.env.PORT || 3000;
 
 let chatId; // Variable to store the chat ID
 let urlToFetch; // Variable to store the URL user wants to fetch data from
@@ -189,7 +185,4 @@ const processHtml = async (html, deposit, rent, perHundred) => {
     }
 };
 
-app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
-    console.log("Bot is running...");
-});
+console.log("Bot is running...");
