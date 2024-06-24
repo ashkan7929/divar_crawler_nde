@@ -178,7 +178,7 @@ const processHtml = async (html, deposit, rent, perHundred) => {
             })
         };
         console.log(newArticle);
-        if (newArticle.isSuitable) {
+        if (newArticle.isSuitable && !processedTokens.has(newArticle.token)) {
             const articleMessage = `
                 Title: ${newArticle.title}
                 Deposit: ${formatNumberWithCommas(newArticle.deposit)}
