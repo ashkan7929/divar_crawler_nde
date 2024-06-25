@@ -26,6 +26,11 @@ let currentState = 'idle'; // Variable to track the current state of the convers
 
 const processedTokens = new Set();
 
+const defaultUrl = 'https://divar.ir/s/tehran/rent-apartment/ajudaniye?districts=1028%2C127%2C138%2C139%2C159%2C170%2C173%2C208%2C210%2C286%2C300%2C301%2C302%2C315%2C360%2C42%2C48%2C55%2C56%2C61%2C62%2C63%2C64%2C65%2C658%2C66%2C67%2C68%2C70%2C71%2C72%2C74%2C75%2C78%2C81%2C84%2C85%2C86%2C87%2C88%2C90%2C920%2C922%2C925%2C929%2C930%2C931%2C934%2C938%2C939%2C941%2C95%2C96&credit=-700000000&rent=-30000000&size=60-&rooms=2&floor=0-';
+const defaultDeposit = 700000000;
+const defaultRent = 30000000;
+const defaultPerHundred = 3000000;
+
 // Function to convert Persian digits to Arabic digits
 const persianToArabicDigits = (persianStr) => {
     const persianDigitMap = {
@@ -60,20 +65,40 @@ const areAllDigitsSame = (num) => {
 };
 
 // Function to check if an article meets suitability criteria
-const isSuitableHandler = ({ deposit, rent, maximumDeposit, maximumRent, perHundred }) => {
+const isSuitableHandler = ({ deposit, rent, maximumDeposit, maximumRent, perHundred, title }) => {
+    if (title.includes('همخانه') && title.includes('همخونه'))
+        return {
+            why: "this is share home",
+            result: false
+        }
     if (deposit > maximumDeposit || rent > maximumRent) {
-        return false;
+        return {
+            why: `deposit is more than ${formatNumberWithCommas(maximumDeposit)} or rent is more than ${maximumRent}`,
+            result: false,
+        };
     }
     if (convertDepositToRent(deposit, perHundred) + rent > maximumRent) {
-        return false;
+        return {
+            why: `converted: ${formatNumberWithCommas(convertDepositToRent(deposit, perHundred))} + ${rent} is more than ${maximumRent}`,
+            result: false,
+        };
     }
     if (rent === 0 && deposit === 0) {
-        return false;
+        return {
+            why: "invalid article",
+            result: false,
+        };
     }
     if (areAllDigitsSame(deposit) || areAllDigitsSame(rent)) {
-        return false;
+        return {
+            why: "invalid article",
+            result: false,
+        };
     }
-    return true;
+    return {
+        why: "",
+        result: true
+    };
 };
 
 // Event listener for incoming messages
@@ -83,9 +108,11 @@ bot.on('message', async (msg) => {
     if (msg.text === "/start") {
         isRunning = true; // Set running flag to true
         currentState = 'awaitingUrl'; // Set the state to awaiting URL
-        bot.sendMessage(chatId, `Welcome ${msg.from.first_name}! Please enter the URL to crawl.`, {
+        bot.sendMessage(chatId, `Welcome ${msg.from.first_name}! Please enter the URL to crawl or use the default URL.`, {
             reply_markup: {
-                keyboard: [['/stop']], // Show the "Start" button
+                inline_keyboard: [
+                    [{ text: 'Use default URL', callback_data: 'use_default_url' }]
+                ]
             }
         });
     } else if (msg.text === "/stop") {
@@ -105,24 +132,83 @@ bot.on('message', async (msg) => {
         urlToFetch = msg.text;
         currentState = 'awaitingDeposit'; // Set the state to awaiting deposit
         console.log(currentState);
-        bot.sendMessage(chatId, "Please enter the deposit amount (in numbers):");
+        bot.sendMessage(chatId, "Please enter the deposit amount (in numbers) or use the default deposit:", {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: `Use default deposit (${defaultDeposit})`, callback_data: 'use_default_deposit' }]
+                ]
+            }
+        });
     } else if (currentState === 'awaitingDeposit' && !isNaN(parseInt(msg.text))) {
-        deposit = parseInt(msg.text);
+        deposit = parseInt(msg.text * 1000000);
         currentState = 'awaitingRent'; // Set the state to awaiting rent
         console.log(currentState);
-        bot.sendMessage(chatId, "Please enter the rent amount (in numbers):");
+        bot.sendMessage(chatId, "Please enter the rent amount (in numbers) or use the default rent:", {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: `Use default rent (${defaultRent})`, callback_data: 'use_default_rent' }]
+                ]
+            }
+        });
     } else if (currentState === 'awaitingRent' && !isNaN(parseInt(msg.text))) {
-        rent = parseInt(msg.text);
+        rent = parseInt(msg.text * 1000000);
         currentState = 'awaitingPerHundred'; // Set the state to awaiting rent
         console.log(currentState);
-        bot.sendMessage(chatId, "Please enter per hundred (in numbers):");
+        bot.sendMessage(chatId, "Please enter per hundred (in numbers) or use the default value:", {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: `Use default per hundred (${defaultPerHundred})`, callback_data: 'use_default_perHundred' }]
+                ]
+            }
+        });
     } else if (currentState === 'awaitingPerHundred' && !isNaN(parseInt(msg.text))) {
-        perHundred = parseInt(msg.text)
+        perHundred = parseInt(msg.text * 1000000)
         currentState = 'idle'; // Reset state
         bot.sendMessage(chatId, `Fetching data from: ${urlToFetch}, Deposit: ${formatNumberWithCommas(deposit)}, rent: ${formatNumberWithCommas(rent)} and per hundred ${formatNumberWithCommas(perHundred)} cost from rent...`)
         fetchData(urlToFetch, deposit, rent, perHundred);
     } else if (isRunning) {
         bot.sendMessage(chatId, "Invalid input. Please enter a correct value.");
+    }
+});
+
+// Handle button clicks
+bot.on('callback_query', (callbackQuery) => {
+    const chatId = callbackQuery.message.chat.id;
+    if (callbackQuery.data === 'use_default_url') {
+        urlToFetch = defaultUrl;
+        currentState = 'awaitingDeposit'; // Set the state to awaiting deposit
+        bot.sendMessage(chatId, "Please enter the deposit amount (in numbers) or use the default deposit:", {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: `Use default deposit (${defaultDeposit})`, callback_data: 'use_default_deposit' }]
+                ]
+            }
+        });
+    } else if (callbackQuery.data === 'use_default_deposit') {
+        deposit = defaultDeposit;
+        currentState = 'awaitingRent'; // Set the state to awaiting rent
+        bot.sendMessage(chatId, "Please enter the rent amount (in numbers) or use the default rent:", {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: `Use default rent (${defaultRent})`, callback_data: 'use_default_rent' }]
+                ]
+            }
+        });
+    } else if (callbackQuery.data === 'use_default_rent') {
+        rent = defaultRent;
+        currentState = 'awaitingPerHundred'; // Set the state to awaiting per hundred
+        bot.sendMessage(chatId, "Please enter per hundred (in numbers) or use the default value:", {
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: `Use default per hundred (${defaultPerHundred})`, callback_data: 'use_default_perHundred' }]
+                ]
+            }
+        });
+    } else if (callbackQuery.data === 'use_default_perHundred') {
+        perHundred = defaultPerHundred;
+        currentState = 'idle'; // Reset state
+        bot.sendMessage(chatId, `Fetching data from: ${urlToFetch}, Deposit: ${formatNumberWithCommas(deposit)}, rent: ${formatNumberWithCommas(rent)} and per hundred ${formatNumberWithCommas(perHundred)} cost from rent...`)
+        fetchData(urlToFetch, deposit, rent, perHundred);
     }
 });
 
@@ -161,7 +247,14 @@ const processHtml = async (html, deposit, rent, perHundred) => {
 
         const articleDeposit = extractNumber(postDeposit);
         const articleRent = extractNumber(postRent);
-
+        const suitableCheckData = isSuitableHandler({
+            deposit: articleDeposit,
+            rent: articleRent,
+            maximumDeposit: deposit,
+            maximumRent: rent,
+            perHundred: perHundred,
+            title
+        })
         const newArticle = {
             title,
             deposit: articleDeposit,
@@ -169,13 +262,8 @@ const processHtml = async (html, deposit, rent, perHundred) => {
             token,
             picture,
             href,
-            isSuitable: !title.includes('همخانه') && !title.includes('همخونه') && isSuitableHandler({
-                deposit: articleDeposit,
-                rent: articleRent,
-                maximumDeposit: deposit,
-                maximumRent: rent,
-                perHundred: perHundred
-            })
+            isSuitable: suitableCheckData.result,
+            whyIsNotSuitable: suitableCheckData.why
         };
         console.log(newArticle);
         if (newArticle.isSuitable && !processedTokens.has(newArticle.token)) {
